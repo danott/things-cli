@@ -13,7 +13,7 @@ func newProjectShowCmd() *cobra.Command {
 	var flagGUI bool
 
 	cmd := &cobra.Command{
-		Use:   "show <id>",
+		Use:   "show <title_or_id>",
 		Short: "Show a project's details",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {

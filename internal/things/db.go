@@ -329,10 +329,10 @@ func (d *DB) ListTodosWithCompleted(view string) ([]Todo, error) {
 	return d.scanTodos(rows)
 }
 
-// ListProjectTodos returns todos belonging to a named project.
-func (d *DB) ListProjectTodos(projectName string) ([]Todo, error) {
-	query := todosQuery + " AND p.title = ? AND t.status = 0 GROUP BY t.uuid ORDER BY t.\"index\""
-	rows, err := d.db.Query(query, projectName)
+// ListProjectTodos returns todos belonging to a project, matched by UUID or title.
+func (d *DB) ListProjectTodos(titleOrID string) ([]Todo, error) {
+	query := todosQuery + " AND (p.uuid = ? OR p.title = ?) AND t.status = 0 GROUP BY t.uuid ORDER BY t.\"index\""
+	rows, err := d.db.Query(query, titleOrID, titleOrID)
 	if err != nil {
 		return nil, err
 	}
@@ -340,10 +340,10 @@ func (d *DB) ListProjectTodos(projectName string) ([]Todo, error) {
 	return d.scanTodos(rows)
 }
 
-// ListAreaTodos returns todos belonging to a named area.
-func (d *DB) ListAreaTodos(areaName string) ([]Todo, error) {
-	query := todosQuery + " AND a.title = ? AND t.status = 0 GROUP BY t.uuid ORDER BY t.\"index\""
-	rows, err := d.db.Query(query, areaName)
+// ListAreaTodos returns todos belonging to an area, matched by UUID or title.
+func (d *DB) ListAreaTodos(titleOrID string) ([]Todo, error) {
+	query := todosQuery + " AND (a.uuid = ? OR a.title = ?) AND t.status = 0 GROUP BY t.uuid ORDER BY t.\"index\""
+	rows, err := d.db.Query(query, titleOrID, titleOrID)
 	if err != nil {
 		return nil, err
 	}
@@ -351,10 +351,10 @@ func (d *DB) ListAreaTodos(areaName string) ([]Todo, error) {
 	return d.scanTodos(rows)
 }
 
-// ListTagTodos returns todos with a specific tag.
-func (d *DB) ListTagTodos(tagName string) ([]Todo, error) {
-	query := todosQuery + " AND tag.title = ? AND t.status = 0 GROUP BY t.uuid ORDER BY t.\"index\""
-	rows, err := d.db.Query(query, tagName)
+// ListTagTodos returns todos with a specific tag, matched by UUID or title.
+func (d *DB) ListTagTodos(titleOrID string) ([]Todo, error) {
+	query := todosQuery + " AND (tag.uuid = ? OR tag.title = ?) AND t.status = 0 GROUP BY t.uuid ORDER BY t.\"index\""
+	rows, err := d.db.Query(query, titleOrID, titleOrID)
 	if err != nil {
 		return nil, err
 	}
@@ -362,10 +362,10 @@ func (d *DB) ListTagTodos(tagName string) ([]Todo, error) {
 	return d.scanTodos(rows)
 }
 
-// GetTodo returns a single todo by ID, including checklist items.
-func (d *DB) GetTodo(id string) (*Todo, error) {
-	query := todosQuery + " AND t.uuid = ? GROUP BY t.uuid"
-	rows, err := d.db.Query(query, id)
+// GetTodo returns a single todo by UUID or title, including checklist items.
+func (d *DB) GetTodo(titleOrID string) (*Todo, error) {
+	query := todosQuery + " AND (t.uuid = ? OR t.title = ?) GROUP BY t.uuid"
+	rows, err := d.db.Query(query, titleOrID, titleOrID)
 	if err != nil {
 		return nil, err
 	}
@@ -375,10 +375,10 @@ func (d *DB) GetTodo(id string) (*Todo, error) {
 		return nil, err
 	}
 	if len(todos) == 0 {
-		return nil, fmt.Errorf("todo not found: %s", id)
+		return nil, fmt.Errorf("todo not found: %s", titleOrID)
 	}
 	todo := &todos[0]
-	items, err := d.ListChecklistItems(id)
+	items, err := d.ListChecklistItems(todo.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -443,18 +443,18 @@ func (d *DB) ListProjects() ([]Project, error) {
 	return projects, rows.Err()
 }
 
-// GetProject returns a project by ID.
-func (d *DB) GetProject(id string) (*Project, error) {
+// GetProject returns a project by UUID or title.
+func (d *DB) GetProject(titleOrID string) (*Project, error) {
 	row := d.db.QueryRow(`
 		SELECT t.uuid, t.title, t.status, COALESCE(t.notes, ''), COALESCE(a.title, '')
 		FROM TMTask t
 		LEFT JOIN TMArea a ON t.area = a.uuid
-		WHERE t.uuid = ? AND t.type = 1
-	`, id)
+		WHERE (t.uuid = ? OR t.title = ?) AND t.type = 1
+	`, titleOrID, titleOrID)
 	var p Project
 	var status int
 	if err := row.Scan(&p.ID, &p.Name, &status, &p.Notes, &p.AreaName); err != nil {
-		return nil, fmt.Errorf("project not found: %s", id)
+		return nil, fmt.Errorf("project not found: %s", titleOrID)
 	}
 	p.Status = dbStatusToStatus(status)
 	return &p, nil

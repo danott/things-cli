@@ -10,6 +10,7 @@ func newTodoCmd() *cobra.Command {
 	}
 
 	cmd.AddCommand(newTodoAddCmd())
+	cmd.AddCommand(newTodoListCmd())
 	cmd.AddCommand(newTodoShowCmd())
 	cmd.AddCommand(newTodoUpdateCmd())
 	cmd.AddCommand(newTodoCompleteCmd())

@@ -13,7 +13,7 @@ func newTodoShowCmd() *cobra.Command {
 	var flagGUI bool
 
 	cmd := &cobra.Command{
-		Use:   "show <id>",
+		Use:   "show <title_or_id>",
 		Short: "Show a todo's details",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
