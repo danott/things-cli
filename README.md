@@ -5,7 +5,7 @@ A command-line interface for [Cultured Code's Things 3](https://culturedcode.com
 ## Install
 
 ```bash
-go install github.com/danott/things-cli@latest
+go install github.com/danott/things-cli@latest # not recommended in these early days
 ```
 
 Or build from source:
