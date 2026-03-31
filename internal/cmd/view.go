@@ -5,6 +5,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/danott/things-cli/internal/config"
 	"github.com/danott/things-cli/internal/interactive"
 	"github.com/danott/things-cli/internal/output"
 	"github.com/danott/things-cli/internal/things"
@@ -36,7 +37,11 @@ func newViewCmd(name string) *cobra.Command {
 				if err != nil {
 					return err
 				}
-				return interactive.Run(db, name, authToken)
+				cfg, err := config.Load()
+				if err != nil {
+					return err
+				}
+				return interactive.Run(db, name, authToken, cfg.Actions)
 			}
 
 			if flagGUI {

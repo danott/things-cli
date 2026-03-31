@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/danott/things-cli/internal/config"
+	"github.com/danott/things-cli/internal/interactive"
 	"github.com/danott/things-cli/internal/output"
 	"github.com/danott/things-cli/internal/things"
 	"github.com/spf13/cobra"
@@ -11,6 +13,7 @@ import (
 
 func newTodoShowCmd() *cobra.Command {
 	var flagGUI bool
+	var flagInteractive bool
 
 	cmd := &cobra.Command{
 		Use:   "show <title_or_id>",
@@ -32,6 +35,24 @@ func newTodoShowCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+
+			if flagInteractive {
+				// Resolve the todo ID (could be a title)
+				todo, err := db.GetTodo(id)
+				if err != nil {
+					return err
+				}
+				authToken, err := things.ResolveAuthToken("")
+				if err != nil {
+					return err
+				}
+				cfg, err := config.Load()
+				if err != nil {
+					return err
+				}
+				return interactive.RunSingle(db, todo.ID, authToken, cfg.Actions)
+			}
+
 			todo, err := db.GetTodo(id)
 			if err != nil {
 				return err
@@ -50,6 +71,7 @@ func newTodoShowCmd() *cobra.Command {
 	}
 
 	cmd.Flags().BoolVar(&flagGUI, "gui", false, "open in Things.app")
+	cmd.Flags().BoolVarP(&flagInteractive, "interactive", "i", false, "interactive mode")
 
 	return cmd
 }

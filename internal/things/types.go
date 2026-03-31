@@ -22,7 +22,9 @@ type Todo struct {
 	ModificationDate *time.Time      `json:"modificationDate,omitempty"`
 	CompletionDate   *time.Time      `json:"completionDate,omitempty"`
 	CancellationDate *time.Time      `json:"cancellationDate,omitempty"`
+	ProjectID        string          `json:"projectID,omitempty"`
 	ProjectName      string          `json:"projectName,omitempty"`
+	AreaID           string          `json:"areaID,omitempty"`
 	AreaName         string          `json:"areaName,omitempty"`
 	StartBucket      int             `json:"startBucket,omitempty"` // 0=morning, 1=evening (Today view only)
 	ChecklistItems   []ChecklistItem `json:"checklistItems,omitempty"`

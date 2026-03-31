@@ -130,8 +130,8 @@ const todosQuery = `
 SELECT t.uuid, t.title, t.status, t.notes,
        t.startDate, t.deadline, t.creationDate, t.userModificationDate, t.stopDate,
        t.todayIndex, t.startBucket,
-       p.title,
-       a.title,
+       p.title, p.uuid,
+       a.title, a.uuid,
        GROUP_CONCAT(tag.title)
 FROM TMTask t
 LEFT JOIN TMTask p ON t.project = p.uuid
@@ -155,12 +155,14 @@ func (d *DB) scanTodos(rows *sql.Rows) ([]Todo, error) {
 			todayIndex   *int64
 			startBucket  *int64
 			projectName  *string
+			projectID    *string
 			areaName     *string
+			areaID       *string
 			tags         *string
 		)
 		err := rows.Scan(&t.ID, &t.Name, &status, &t.Notes,
 			&startDate, &deadline, &creationDate, &modDate, &stopDate,
-			&todayIndex, &startBucket, &projectName, &areaName, &tags)
+			&todayIndex, &startBucket, &projectName, &projectID, &areaName, &areaID, &tags)
 		if err != nil {
 			return nil, fmt.Errorf("scan todo: %w", err)
 		}
@@ -183,8 +185,14 @@ func (d *DB) scanTodos(rows *sql.Rows) ([]Todo, error) {
 		if projectName != nil {
 			t.ProjectName = *projectName
 		}
+		if projectID != nil {
+			t.ProjectID = *projectID
+		}
 		if areaName != nil {
 			t.AreaName = *areaName
+		}
+		if areaID != nil {
+			t.AreaID = *areaID
 		}
 		if tags != nil {
 			t.TagNames = *tags
@@ -239,7 +247,7 @@ func (d *DB) ListTodos(view string) ([]Todo, error) {
 	case "trash":
 		query = `SELECT t.uuid, t.title, t.status, t.notes,
 			t.startDate, t.deadline, t.creationDate, t.userModificationDate, t.stopDate,
-			t.todayIndex, t.startBucket, p.title, a.title, GROUP_CONCAT(tag.title)
+			t.todayIndex, t.startBucket, p.title, p.uuid, a.title, a.uuid, GROUP_CONCAT(tag.title)
 			FROM TMTask t
 			LEFT JOIN TMTask p ON t.project = p.uuid
 			LEFT JOIN TMArea a ON t.area = a.uuid

@@ -298,6 +298,43 @@ Example — create a project with headings and todos in one shot:
 ]
 ```
 
+## Custom actions
+
+Register custom keybindings for interactive mode via `~/.config/things-cli/config.toml`. By default, actions receive the selected todo as JSON on stdin.
+
+```toml
+[[actions]]
+key = "y"
+label = "view"
+command = "more"
+
+[[actions]]
+key = "p"
+label = "copy id"
+command = "pbcopy"
+input = "id"
+mode = "run"
+
+[[actions]]
+key = "s"
+label = "process"
+command = "my-script"
+input = "id"
+input_mode = "arg"
+args = ["--verbose"]
+# runs: my-script <todo-uuid> --verbose
+```
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `key` | yes | Single key to bind (must not conflict with built-in keys) |
+| `label` | no | Shown in the help bar |
+| `command` | yes | Executable to run |
+| `args` | no | Static arguments passed to the command |
+| `mode` | no | `exec` (default) takes over the terminal; `run` executes in the background and shows output in the status bar |
+| `input` | no | What to pass: `json` (default), `markdown`, or `id` |
+| `input_mode` | no | How to pass it: `stdin` (default) or `arg` (prepended to `args`) |
+
 ## Version
 
 ```bash

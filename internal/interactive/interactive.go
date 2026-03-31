@@ -1,6 +1,7 @@
 package interactive
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -13,6 +14,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/fsnotify/fsnotify"
 
+	"github.com/danott/things-cli/internal/config"
 	"github.com/danott/things-cli/internal/editor"
 	"github.com/danott/things-cli/internal/things"
 )
@@ -40,11 +42,13 @@ type model struct {
 	authToken string
 	err       error
 	status    string
+	actions   []config.Action
 
 	// Detail view state
 	detailOpen   bool
 	detailLines  []string
 	detailOffset int
+	singleMode   bool // when true, quitting detail view quits the app
 }
 
 type dbChangedMsg struct{}
@@ -55,17 +59,21 @@ type editorFinishedMsg struct {
 	err      error
 }
 
-func Run(db *things.DB, view, authToken string) error {
+type actionFinishedMsg struct {
+	err error
+}
+
+func Run(db *things.DB, view, authToken string, actions []config.Action) error {
 	loader := func() ([]things.Todo, error) {
 		return db.ListTodosWithCompleted(view)
 	}
-	return RunWithLoader(db, view, view, loader, authToken)
+	return RunWithLoader(db, view, view, loader, authToken, actions)
 }
 
 // RunWithLoader starts the interactive TUI with a custom todo loader.
 // title is shown as the list heading; view is used for add/when behavior.
-func RunWithLoader(db *things.DB, title, view string, loader func() ([]things.Todo, error), authToken string) error {
-	m, err := newModel(db, title, view, loader, authToken)
+func RunWithLoader(db *things.DB, title, view string, loader func() ([]things.Todo, error), authToken string, actions []config.Action) error {
+	m, err := newModel(db, title, view, loader, authToken, actions)
 	if err != nil {
 		return err
 	}
@@ -74,7 +82,48 @@ func RunWithLoader(db *things.DB, title, view string, loader func() ([]things.To
 	return err
 }
 
-func newModel(db *things.DB, title, view string, loader func() ([]things.Todo, error), authToken string) (model, error) {
+// RunSingle starts the interactive TUI showing the detail view for a single todo.
+func RunSingle(db *things.DB, todoID, authToken string, actions []config.Action) error {
+	todo, err := db.GetTodo(todoID)
+	if err != nil {
+		return err
+	}
+
+	loader := func() ([]things.Todo, error) {
+		t, err := db.GetTodo(todoID)
+		if err != nil {
+			return nil, err
+		}
+		return []things.Todo{*t}, nil
+	}
+
+	ti := textinput.New()
+	ti.Prompt = "  + "
+	ti.Placeholder = "new todo"
+	ti.CharLimit = 256
+
+	m := model{
+		view:         "",
+		title:        todo.Name,
+		loader:       loader,
+		db:           db,
+		items:        []things.Todo{*todo},
+		addInput:     ti,
+		authToken:    authToken,
+		actions:      actions,
+		height:       24,
+		detailOpen:   true,
+		detailLines:  strings.Split(things.TodoToMarkdown(todo), "\n"),
+		detailOffset: 0,
+		singleMode:   true,
+	}
+
+	p := tea.NewProgram(m, tea.WithAltScreen())
+	_, err = p.Run()
+	return err
+}
+
+func newModel(db *things.DB, title, view string, loader func() ([]things.Todo, error), authToken string, actions []config.Action) (model, error) {
 	todos, err := loader()
 	if err != nil {
 		return model{}, err
@@ -93,6 +142,7 @@ func newModel(db *things.DB, title, view string, loader func() ([]things.Todo, e
 		items:     todos,
 		addInput:  ti,
 		authToken: authToken,
+		actions:   actions,
 		height:    24, // default, updated on WindowSizeMsg
 	}, nil
 }
@@ -144,9 +194,9 @@ func (m *model) clampScroll() {
 }
 
 // detailHeight returns how many content lines fit in the detail viewport.
-// Reserve: breadcrumb (1) + blank (1) + help bar (2).
+// Reserve: help bar (2).
 func (m model) detailHeight() int {
-	h := m.height - 4
+	h := m.height - 2
 	if h < 1 {
 		h = 1
 	}
@@ -193,6 +243,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if err := m.applyEdit(msg.todoID, msg.tempPath); err != nil {
 			m.err = err
+		}
+		return m, nil
+
+	case actionFinishedMsg:
+		if msg.err != nil {
+			m.err = msg.err
 		}
 		return m, nil
 
@@ -296,6 +352,15 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.addInput.Focus()
 			return m, textinput.Blink
 		}
+
+	default:
+		if m.cursor < len(m.items) {
+			for _, action := range m.actions {
+				if msg.String() == action.Key {
+					return m.runAction(action)
+				}
+			}
+		}
 	}
 
 	return m, nil
@@ -332,7 +397,17 @@ func (m model) updateAdding(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m model) updateDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "esc", "enter", "q":
+	case "esc", "q":
+		if m.singleMode {
+			return m, tea.Quit
+		}
+		m.detailOpen = false
+		return m, nil
+
+	case "enter":
+		if m.singleMode {
+			return m, tea.Quit
+		}
 		m.detailOpen = false
 		return m, nil
 
@@ -374,9 +449,53 @@ func (m model) updateDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, clearStatusAfter(2 * time.Second)
 		}
 
+	case "x":
+		if m.cursor < len(m.items) {
+			todo := m.items[m.cursor]
+			switch todo.Status {
+			case things.StatusCompleted:
+				b := things.UpdateTodo(todo.ID, m.authToken, things.UpdateTodoOptions{Status: things.StatusPtr(things.StatusOpen)})
+				_ = b.Open()
+			case things.StatusOpen:
+				b := things.UpdateTodo(todo.ID, m.authToken, things.UpdateTodoOptions{Status: things.StatusPtr(things.StatusCompleted)})
+				if err := b.Open(); err != nil {
+					m.err = err
+				}
+			}
+		}
+
+	case "ctrl+x":
+		if m.cursor < len(m.items) {
+			todo := m.items[m.cursor]
+			switch todo.Status {
+			case things.StatusCanceled:
+				b := things.UpdateTodo(todo.ID, m.authToken, things.UpdateTodoOptions{Status: things.StatusPtr(things.StatusOpen)})
+				_ = b.Open()
+			case things.StatusOpen:
+				b := things.UpdateTodo(todo.ID, m.authToken, things.UpdateTodoOptions{Status: things.StatusPtr(things.StatusCanceled)})
+				if err := b.Open(); err != nil {
+					m.err = err
+				}
+			}
+		}
+
+	case "X":
+		if err := things.LogCompleted(); err != nil {
+			m.err = err
+		}
+
 	case "e":
 		if m.cursor < len(m.items) {
 			return m.openEditor()
+		}
+
+	default:
+		if m.cursor < len(m.items) {
+			for _, action := range m.actions {
+				if msg.String() == action.Key {
+					return m.runAction(action)
+				}
+			}
 		}
 	}
 
@@ -492,6 +611,9 @@ func (m model) View() string {
 	if viewSupportsAdd(m.view) {
 		help += "  a: add"
 	}
+	for _, action := range m.actions {
+		help += fmt.Sprintf("  %s: %s", action.Key, action.Label)
+	}
 	help += "  q: quit"
 	b.WriteString("\n")
 	b.WriteString(dimStyle.Render(help))
@@ -501,13 +623,6 @@ func (m model) View() string {
 
 func (m model) viewDetail() string {
 	var b strings.Builder
-
-	// Breadcrumb
-	title := ""
-	if m.cursor < len(m.items) {
-		title = m.items[m.cursor].Name
-	}
-	b.WriteString(dimStyle.Render(" \u2039 ") + title + "\n\n")
 
 	// Content
 	dh := m.detailHeight()
@@ -547,7 +662,16 @@ func (m model) viewDetail() string {
 
 	// Help bar
 	b.WriteString("\n")
-	b.WriteString(dimStyle.Render("j/k: scroll  c: copy  e: edit  enter/esc: back"))
+	detailHelp := "j/k: scroll  x: complete  ctrl+x: cancel  c: copy  e: edit"
+	for _, action := range m.actions {
+		detailHelp += fmt.Sprintf("  %s: %s", action.Key, action.Label)
+	}
+	if m.singleMode {
+		detailHelp += "  q: quit"
+	} else {
+		detailHelp += "  enter/esc: back"
+	}
+	b.WriteString(dimStyle.Render(detailHelp))
 
 	return b.String()
 }
@@ -568,6 +692,58 @@ func (m *model) applyEdit(todoID, tempPath string) error {
 		return err
 	}
 	return things.JSONCommand(payload, m.authToken, false).Open()
+}
+
+func (m model) runAction(action config.Action) (tea.Model, tea.Cmd) {
+	todo := m.items[m.cursor]
+
+	var content string
+	switch action.Input {
+	case config.ActionInputJSON:
+		b, err := json.MarshalIndent(todo, "", "  ")
+		if err != nil {
+			m.err = err
+			return m, nil
+		}
+		content = string(b)
+	case config.ActionInputMarkdown:
+		content = things.TodoToMarkdown(&todo)
+	case config.ActionInputID:
+		content = todo.ID
+	}
+
+	var args []string
+	if action.InputMode == config.ActionInputModeArg {
+		args = append([]string{content}, action.Args...)
+	} else {
+		args = append([]string{}, action.Args...)
+	}
+	c := exec.Command(action.Command, args...)
+
+	if action.InputMode == config.ActionInputModeStdin {
+		c.Stdin = strings.NewReader(content)
+	}
+
+	switch action.Mode {
+	case config.ActionModeRun:
+		out, err := c.CombinedOutput()
+		if err != nil {
+			m.err = err
+		} else {
+			msg := strings.TrimSpace(string(out))
+			if msg == "" {
+				msg = action.Label + ": done"
+			}
+			m.status = msg
+			return m, clearStatusAfter(2 * time.Second)
+		}
+		return m, nil
+
+	default: // exec
+		return m, tea.ExecProcess(c, func(err error) tea.Msg {
+			return actionFinishedMsg{err: err}
+		})
+	}
 }
 
 func watchDB() tea.Cmd {

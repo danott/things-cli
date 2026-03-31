@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/danott/things-cli/internal/config"
 	"github.com/danott/things-cli/internal/interactive"
 	"github.com/danott/things-cli/internal/output"
 	"github.com/danott/things-cli/internal/things"
@@ -59,7 +60,11 @@ func newTodoListCmd() *cobra.Command {
 				if err != nil {
 					return err
 				}
-				return interactive.RunWithLoader(db, title, "", loader, authToken)
+				cfg, err := config.Load()
+				if err != nil {
+					return err
+				}
+				return interactive.RunWithLoader(db, title, "", loader, authToken, cfg.Actions)
 			}
 
 			todos, err := loader()

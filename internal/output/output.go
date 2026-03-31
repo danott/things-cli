@@ -57,37 +57,7 @@ func PrintTodosJSON(w io.Writer, todos []things.Todo) error {
 }
 
 func PrintTodoText(w io.Writer, t *things.Todo) {
-	fmt.Fprintf(w, "%s\n", t.Name)
-	fmt.Fprintf(w, "ID: %s\n", t.ID)
-	fmt.Fprintf(w, "Status: %s\n", t.Status)
-	if t.ProjectName != "" {
-		fmt.Fprintf(w, "Project: %s\n", t.ProjectName)
-	}
-	if t.AreaName != "" {
-		fmt.Fprintf(w, "Area: %s\n", t.AreaName)
-	}
-	if t.TagNames != "" {
-		fmt.Fprintf(w, "Tags: %s\n", t.TagNames)
-	}
-	if t.DueDate != nil {
-		fmt.Fprintf(w, "Deadline: %s\n", t.DueDate.Format("2006-01-02"))
-	}
-	if t.ActivationDate != nil {
-		fmt.Fprintf(w, "When: %s\n", t.ActivationDate.Format("2006-01-02"))
-	}
-	if t.Notes != "" {
-		fmt.Fprintf(w, "\n%s\n", t.Notes)
-	}
-	if len(t.ChecklistItems) > 0 {
-		fmt.Fprintln(w)
-		for _, item := range t.ChecklistItems {
-			check := "[ ]"
-			if item.Status == things.StatusCompleted {
-				check = "[x]"
-			}
-			fmt.Fprintf(w, "%s %s\n", check, item.Name)
-		}
-	}
+	fmt.Fprint(w, things.TodoToMarkdown(t))
 }
 
 func PrintTodoMarkdown(w io.Writer, t *things.Todo) {
