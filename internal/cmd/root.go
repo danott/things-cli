@@ -27,6 +27,8 @@ func getDB() (*things.DB, error) {
 }
 
 func NewRootCmd(version string) *cobra.Command {
+	cobra.EnableCommandSorting = false
+
 	cmd := &cobra.Command{
 		Use:   "things",
 		Short: "CLI for Things 3",
@@ -50,18 +52,24 @@ func NewRootCmd(version string) *cobra.Command {
 	cmd.PersistentFlags().BoolVar(&flagJSON, "json", false, "output as JSON")
 	cmd.PersistentFlags().BoolVar(&flagMarkdown, "md", false, "output as Markdown")
 
-	cmd.AddCommand(newTodoCmd())
-	cmd.AddCommand(newProjectCmd())
-	cmd.AddCommand(newAreaCmd())
-	cmd.AddCommand(newTagCmd())
-	cmd.AddCommand(newJSONCmd())
-	cmd.AddCommand(newSearchCmd())
-	cmd.AddCommand(newAuthCmd())
-	cmd.AddCommand(newVersionCmd(version))
+	cmd.AddGroup(&cobra.Group{ID: "views", Title: "Views:"})
+	cmd.AddGroup(&cobra.Group{ID: "manage", Title: "Commands:"})
+
+	addCmd := func(c *cobra.Command, groupID string) {
+		c.GroupID = groupID
+		cmd.AddCommand(c)
+	}
 
 	for _, view := range views {
-		cmd.AddCommand(newViewCmd(view))
+		addCmd(newViewCmd(view), "views")
 	}
+	addCmd(newTodoCmd(), "manage")
+	addCmd(newProjectCmd(), "manage")
+	addCmd(newAreaCmd(), "manage")
+	addCmd(newTagCmd(), "manage")
+	addCmd(newJSONCmd(), "manage")
+	addCmd(newAuthCmd(), "manage")
+	addCmd(newVersionCmd(version), "manage")
 
 	return cmd
 }

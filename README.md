@@ -254,14 +254,6 @@ things tag rename "Errand" "Errands"
 things tag delete "Errands"
 ```
 
-## Search
-
-Opens the Things search UI.
-
-```bash
-things search "quarterly report"
-```
-
 ## JSON command
 
 Send a JSON array of create/update operations directly to Things. Full schema documented at [culturedcode.com](https://culturedcode.com/things/support/articles/2803573/).
