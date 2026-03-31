@@ -42,42 +42,65 @@ These flags work on every command:
 |------|-------------|
 | `--dry-run` | Print the action (URL or AppleScript) without executing it |
 | `--json` | Output as JSON (on read commands) |
+| `--md` | Output as Markdown (on read commands) |
+
+## Views
+
+Each view is a top-level subcommand that lists todos for that view.
+
+```bash
+things inbox
+things today
+things upcoming
+things anytime
+things someday
+things logbook
+things trash
+
+# Open in Things.app instead of listing to stdout
+things today --gui
+
+# Show todo IDs alongside titles
+things today --verbose
+
+# Interactive mode — navigate and act on todos in the terminal
+things today --interactive
+things today -i
+
+# Today morning/evening split
+things today --morning
+things today --evening
+
+# Logbook pagination and filtering
+things logbook --limit 20
+things logbook --offset 40
+things logbook --since 2026-01-01
+things logbook --until 2026-03-01
+things logbook --since 2026-01-01 --until 2026-03-31
+```
 
 ## Todos
 
-### List
+### List by project, area, or tag
 
 ```bash
-things todo list                        # Today (default)
-things todo list --inbox
-things todo list --upcoming
-things todo list --anytime
-things todo list --someday
-things todo list --logbook              # last 50 completed/canceled
-
-# Logbook pagination and filtering
-things todo list --logbook --limit 20
-things todo list --logbook --offset 40
-things todo list --logbook --since 2026-01-01
-things todo list --logbook --until 2026-03-01
-things todo list --logbook --since 2026-01-01 --until 2026-03-31
-
-# Today morning/evening split
-things todo list --morning              # morning items only
-things todo list --evening              # evening items only
-
-# Filter by project, area, or tag
 things todo list --project "Website Redesign"
 things todo list --area "Work"
 things todo list --tag "Errands"
+
+# Interactive mode
+things todo list --project "Sprint 42" --interactive
+things todo list --project "Sprint 42" -i
 ```
+
+Exactly one of `--project`, `--area`, or `--tag` is required. Values can be a title or UUID.
 
 ### Show
 
 ```bash
-things todo show <id>                   # print details to stdout
-things todo show <id> --json            # includes checklist items
-things todo show <id> --gui             # open in Things.app
+things todo show <title_or_id>              # print details to stdout
+things todo show <title_or_id> --json       # includes checklist items
+things todo show <title_or_id> --gui        # open in Things.app
 ```
 
 ### Add
@@ -89,11 +112,13 @@ things todo add "File taxes" --deadline 2026-04-15 --tags "Finance"
 things todo add "Draft proposal" --notes "See Q2 brief" --list "Work"
 things todo add "Groceries" --checklist-items $'Milk\nBread\nEggs'
 things todo add "Review PR" --when today --list "Sprint 42" --heading "In Review"
-things todo add "Buy milk" --dry-run    # print URL without opening
+things todo add "Buy milk" --dry-run        # print URL without opening
+things todo add "Task" --reveal             # navigate to the created todo in Things
+things todo add --show-quick-entry          # open Quick Entry dialog instead
 
 # Open $EDITOR to compose the todo as markdown
 things todo add --edit
-things todo add "File taxes" --edit     # pre-populates the title
+things todo add "File taxes" --edit         # pre-populates the title
 ```
 
 `--when` accepts: `today`, `tomorrow`, `evening`, `anytime`, `someday`, or `YYYY-MM-DD`.
@@ -118,7 +143,7 @@ Notes as freeform prose.
 - [ ] Fill out forms
 ```
 
-Frontmatter fields: `when`, `deadline`, `tags`, `list`, `list-id`, `heading`. The body is free-form: the first `# H1` is the title, `- [ ]`/`- [x]` lines are checklist items, everything else is notes.
+Frontmatter fields: `when`, `deadline`, `tags`, `list`, `list-id`, `heading`, `heading-id`. The body is free-form: the first `# H1` is the title, `- [ ]`/`- [x]` lines are checklist items, everything else is notes.
 
 ### Update
 
@@ -130,11 +155,20 @@ things todo update <id> --edit
 
 things todo update <id> --title "New title"
 things todo update <id> --when tomorrow
+things todo update <id> --notes "Replace notes"
 things todo update <id> --append-notes "Follow-up needed"
-things todo update <id> --add-tags "Urgent"
+things todo update <id> --prepend-notes "Context: "
+things todo update <id> --tags "Urgent,Work"           # replaces all tags
+things todo update <id> --add-tags "Urgent"            # adds without removing existing
 things todo update <id> --deadline 2026-06-01
 things todo update <id> --list "Sprint 43"
-things todo update <id> --checklist-items $'Step 1\nStep 2\nStep 3'
+things todo update <id> --list-id <project-id>
+things todo update <id> --heading "In Review"
+things todo update <id> --heading-id <heading-id>
+things todo update <id> --checklist-items $'Step 1\nStep 2\nStep 3'   # replaces all items
+things todo update <id> --append-checklist-items $'Step 4\nStep 5'
+things todo update <id> --prepend-checklist-items "Step 0"
+things todo update <id> --reveal
 things todo update <id> --dry-run
 ```
 
@@ -218,22 +252,6 @@ things tag add "Errand"
 things tag add "Home" --parent "Places"
 things tag rename "Errand" "Errands"
 things tag delete "Errands"
-```
-
-## Navigate to a view
-
-Prints a list of todos to stdout by default. `--gui` opens Things.app at that view.
-
-```bash
-things show today
-things show inbox
-things show upcoming
-things show anytime
-things show someday
-things show logbook
-things show deadlines
-things show tomorrow
-things show today --gui
 ```
 
 ## Search
