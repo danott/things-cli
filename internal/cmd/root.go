@@ -9,8 +9,9 @@ import (
 )
 
 var (
-	flagDryRun bool
-	flagJSON   bool
+	flagDryRun   bool
+	flagJSON     bool
+	flagMarkdown bool
 )
 
 // Shared database connection, opened lazily on first read command.
@@ -47,6 +48,7 @@ func NewRootCmd(version string) *cobra.Command {
 
 	cmd.PersistentFlags().BoolVar(&flagDryRun, "dry-run", false, "print the action without executing it")
 	cmd.PersistentFlags().BoolVar(&flagJSON, "json", false, "output as JSON")
+	cmd.PersistentFlags().BoolVar(&flagMarkdown, "md", false, "output as Markdown")
 
 	cmd.AddCommand(newTodoCmd())
 	cmd.AddCommand(newProjectCmd())

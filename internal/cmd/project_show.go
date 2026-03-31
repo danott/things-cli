@@ -40,6 +40,10 @@ func newProjectShowCmd() *cobra.Command {
 			if flagJSON {
 				return output.PrintProjectJSON(os.Stdout, project)
 			}
+			if flagMarkdown {
+				output.PrintProjectMarkdown(os.Stdout, project)
+				return nil
+			}
 			output.PrintProjectText(os.Stdout, project)
 			return nil
 		},

@@ -25,6 +25,10 @@ func newProjectListCmd() *cobra.Command {
 			if flagJSON {
 				return output.PrintProjectsJSON(os.Stdout, projects)
 			}
+			if flagMarkdown {
+				output.PrintProjectsMarkdown(os.Stdout, projects)
+				return nil
+			}
 
 			if len(projects) == 0 {
 				fmt.Println("No projects found.")

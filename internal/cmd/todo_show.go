@@ -40,6 +40,10 @@ func newTodoShowCmd() *cobra.Command {
 			if flagJSON {
 				return output.PrintTodoJSON(os.Stdout, todo)
 			}
+			if flagMarkdown {
+				output.PrintTodoMarkdown(os.Stdout, todo)
+				return nil
+			}
 			output.PrintTodoText(os.Stdout, todo)
 			return nil
 		},

@@ -40,6 +40,10 @@ func newAreaListCmd() *cobra.Command {
 			if flagJSON {
 				return output.PrintAreasJSON(os.Stdout, areas)
 			}
+			if flagMarkdown {
+				output.PrintAreasMarkdown(os.Stdout, areas)
+				return nil
+			}
 
 			if len(areas) == 0 {
 				fmt.Println("No areas found.")

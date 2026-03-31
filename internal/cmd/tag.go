@@ -39,6 +39,10 @@ func newTagListCmd() *cobra.Command {
 			if flagJSON {
 				return output.PrintTagsJSON(os.Stdout, tags)
 			}
+			if flagMarkdown {
+				output.PrintTagsMarkdown(os.Stdout, tags)
+				return nil
+			}
 
 			if len(tags) == 0 {
 				fmt.Println("No tags found.")

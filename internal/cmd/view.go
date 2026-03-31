@@ -14,15 +14,6 @@ import (
 var views = []string{"inbox", "today", "upcoming", "anytime", "someday", "logbook", "trash"}
 
 func newViewCmd(name string) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   name,
-		Short: fmt.Sprintf("The %s list", name),
-	}
-	cmd.AddCommand(newViewShowCmd(name))
-	return cmd
-}
-
-func newViewShowCmd(name string) *cobra.Command {
 	var flagGUI bool
 	var flagInteractive bool
 	var flagVerbose bool
@@ -33,7 +24,7 @@ func newViewShowCmd(name string) *cobra.Command {
 	var flagSince, flagUntil string
 
 	cmd := &cobra.Command{
-		Use:   "show",
+		Use:   name,
 		Short: fmt.Sprintf("Show todos in %s", name),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if flagInteractive {
@@ -89,6 +80,10 @@ func newViewShowCmd(name string) *cobra.Command {
 
 			if flagJSON {
 				return output.PrintTodosJSON(os.Stdout, todos)
+			}
+			if flagMarkdown {
+				output.PrintTodosMarkdown(os.Stdout, todos)
+				return nil
 			}
 
 			if len(todos) == 0 {
