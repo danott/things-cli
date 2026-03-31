@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/danott/things-cli/internal/interactive"
 	"github.com/danott/things-cli/internal/output"
 	"github.com/danott/things-cli/internal/things"
 	"github.com/spf13/cobra"
@@ -11,6 +12,7 @@ import (
 
 func newTodoListCmd() *cobra.Command {
 	var flagProject, flagArea, flagTag string
+	var flagInteractive bool
 
 	cmd := &cobra.Command{
 		Use:   "list",
@@ -38,15 +40,29 @@ func newTodoListCmd() *cobra.Command {
 				return err
 			}
 
-			var todos []things.Todo
+			var title string
+			var loader func() ([]things.Todo, error)
 			switch {
 			case flagProject != "":
-				todos, err = db.ListProjectTodos(flagProject)
+				title = flagProject
+				loader = func() ([]things.Todo, error) { return db.ListProjectTodos(flagProject) }
 			case flagArea != "":
-				todos, err = db.ListAreaTodos(flagArea)
+				title = flagArea
+				loader = func() ([]things.Todo, error) { return db.ListAreaTodos(flagArea) }
 			case flagTag != "":
-				todos, err = db.ListTagTodos(flagTag)
+				title = flagTag
+				loader = func() ([]things.Todo, error) { return db.ListTagTodos(flagTag) }
 			}
+
+			if flagInteractive {
+				authToken, err := things.ResolveAuthToken("")
+				if err != nil {
+					return err
+				}
+				return interactive.RunWithLoader(db, title, "", loader, authToken)
+			}
+
+			todos, err := loader()
 			if err != nil {
 				return err
 			}
@@ -71,6 +87,7 @@ func newTodoListCmd() *cobra.Command {
 	cmd.Flags().StringVar(&flagProject, "project", "", "filter by project title or ID")
 	cmd.Flags().StringVar(&flagArea, "area", "", "filter by area title or ID")
 	cmd.Flags().StringVar(&flagTag, "tag", "", "filter by tag title or ID")
+	cmd.Flags().BoolVarP(&flagInteractive, "interactive", "i", false, "interactive mode")
 
 	return cmd
 }

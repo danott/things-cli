@@ -28,6 +28,8 @@ var (
 
 type model struct {
 	view      string
+	title     string
+	loader    func() ([]things.Todo, error)
 	db        *things.DB
 	items     []things.Todo
 	cursor    int
@@ -54,7 +56,16 @@ type editorFinishedMsg struct {
 }
 
 func Run(db *things.DB, view, authToken string) error {
-	m, err := newModel(db, view, authToken)
+	loader := func() ([]things.Todo, error) {
+		return db.ListTodosWithCompleted(view)
+	}
+	return RunWithLoader(db, view, view, loader, authToken)
+}
+
+// RunWithLoader starts the interactive TUI with a custom todo loader.
+// title is shown as the list heading; view is used for add/when behavior.
+func RunWithLoader(db *things.DB, title, view string, loader func() ([]things.Todo, error), authToken string) error {
+	m, err := newModel(db, title, view, loader, authToken)
 	if err != nil {
 		return err
 	}
@@ -63,8 +74,8 @@ func Run(db *things.DB, view, authToken string) error {
 	return err
 }
 
-func newModel(db *things.DB, view, authToken string) (model, error) {
-	todos, err := db.ListTodosWithCompleted(view)
+func newModel(db *things.DB, title, view string, loader func() ([]things.Todo, error), authToken string) (model, error) {
+	todos, err := loader()
 	if err != nil {
 		return model{}, err
 	}
@@ -76,6 +87,8 @@ func newModel(db *things.DB, view, authToken string) (model, error) {
 
 	return model{
 		view:      view,
+		title:     title,
+		loader:    loader,
 		db:        db,
 		items:     todos,
 		addInput:  ti,
@@ -388,7 +401,7 @@ func (m model) openEditor() (tea.Model, tea.Cmd) {
 }
 
 func (m model) refresh() model {
-	todos, err := m.db.ListTodosWithCompleted(m.view)
+	todos, err := m.loader()
 	if err != nil {
 		m.err = err
 		return m
@@ -422,7 +435,7 @@ func (m model) View() string {
 
 	var b strings.Builder
 
-	b.WriteString(fmt.Sprintf(" %s\n\n", strings.Title(m.view)))
+	b.WriteString(fmt.Sprintf(" %s\n\n", strings.Title(m.title)))
 
 	if len(m.items) == 0 && !m.adding {
 		b.WriteString(dimStyle.Render("  No items."))
