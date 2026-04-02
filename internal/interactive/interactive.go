@@ -703,6 +703,14 @@ func (m *model) applyEdit(todoID, tempPath string) error {
 		return err
 	}
 
+	// Don't send `when` if it hasn't changed — Things treats any explicit `when`
+	// as a reschedule, which resets todayIndex and moves the item to the top.
+	if todo, err := m.db.GetTodo(todoID); err == nil {
+		if todo.ActivationDate != nil && opts.When == todo.ActivationDate.Format("2006-01-02") {
+			opts.When = ""
+		}
+	}
+
 	payload, err := things.BuildTodoUpdateJSON(todoID, opts, checklist)
 	if err != nil {
 		return err
