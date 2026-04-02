@@ -23,12 +23,20 @@ func newTodoShowCmd() *cobra.Command {
 			id := args[0]
 
 			if flagGUI {
-				b := things.ShowItem(id)
+				db, err := getDB()
+				if err != nil {
+					return err
+				}
+				todo, err := db.GetTodo(id)
+				if err != nil {
+					return err
+				}
+				b := things.ShowItem(todo.ID)
 				if flagDryRun {
 					fmt.Println(b.Build())
 					return nil
 				}
-				return b.Open()
+				return b.OpenForeground()
 			}
 
 			db, err := getDB()

@@ -71,7 +71,7 @@ func Load() (Config, error) {
 
 var reservedKeys = map[string]bool{
 	"j": true, "k": true, "g": true, "G": true,
-	"x": true, "X": true, "e": true, "a": true,
+	"x": true, "X": true, "e": true, "a": true, "o": true,
 	"q": true, "c": true, "C": true,
 	"enter": true, "esc": true,
 	"up": true, "down": true, "home": true, "end": true,

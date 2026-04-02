@@ -64,8 +64,20 @@ func (b *URLBuilder) Open() error {
 	return OpenURL(b.Build())
 }
 
+func (b *URLBuilder) OpenForeground() error {
+	return OpenURLForeground(b.Build())
+}
+
 func OpenURL(thingsURL string) error {
 	cmd := exec.Command("open", "-g", thingsURL)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("open URL: %s: %w", strings.TrimSpace(string(out)), err)
+	}
+	return nil
+}
+
+func OpenURLForeground(thingsURL string) error {
+	cmd := exec.Command("open", thingsURL)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("open URL: %s: %w", strings.TrimSpace(string(out)), err)
 	}

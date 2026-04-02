@@ -54,7 +54,7 @@ func newViewCmd(name string) *cobra.Command {
 					fmt.Println(b.Build())
 					return nil
 				}
-				return b.Open()
+				return b.OpenForeground()
 			}
 
 			db, err := getDB()

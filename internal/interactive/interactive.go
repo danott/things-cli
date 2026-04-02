@@ -345,6 +345,14 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m.openEditor()
 		}
 
+	case "o":
+		if m.cursor < len(m.items) {
+			todo := m.items[m.cursor]
+			if err := things.ShowItem(todo.ID).OpenForeground(); err != nil {
+				m.err = err
+			}
+		}
+
 	case "a":
 		if viewSupportsAdd(m.view) {
 			m.adding = true
@@ -489,6 +497,14 @@ func (m model) updateDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m.openEditor()
 		}
 
+	case "o":
+		if m.cursor < len(m.items) {
+			todo := m.items[m.cursor]
+			if err := things.ShowItem(todo.ID).OpenForeground(); err != nil {
+				m.err = err
+			}
+		}
+
 	default:
 		if m.cursor < len(m.items) {
 			for _, action := range m.actions {
@@ -607,7 +623,7 @@ func (m model) View() string {
 		b.WriteString(fmt.Sprintf("\n  Error: %v\n", m.err))
 	}
 
-	help := "j/k: navigate  enter: view  e: edit  x: complete  ctrl+x: cancel  X: clear done"
+	help := "j/k: navigate  enter: view  e: edit  o: reveal  x: complete  ctrl+x: cancel  X: clear done"
 	if viewSupportsAdd(m.view) {
 		help += "  a: add"
 	}
@@ -662,7 +678,7 @@ func (m model) viewDetail() string {
 
 	// Help bar
 	b.WriteString("\n")
-	detailHelp := "j/k: scroll  x: complete  ctrl+x: cancel  c: copy  e: edit"
+	detailHelp := "j/k: scroll  x: complete  ctrl+x: cancel  c: copy  e: edit  o: reveal"
 	for _, action := range m.actions {
 		detailHelp += fmt.Sprintf("  %s: %s", action.Key, action.Label)
 	}
