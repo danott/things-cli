@@ -41,14 +41,16 @@ func newTodoListCmd() *cobra.Command {
 				return err
 			}
 
-			var title string
+			var title, addList string
 			var loader func() ([]things.Todo, error)
 			switch {
 			case flagProject != "":
 				title = flagProject
+				addList = flagProject
 				loader = func() ([]things.Todo, error) { return db.ListProjectTodos(flagProject) }
 			case flagArea != "":
 				title = flagArea
+				addList = flagArea
 				loader = func() ([]things.Todo, error) { return db.ListAreaTodos(flagArea) }
 			case flagTag != "":
 				title = flagTag
@@ -64,7 +66,22 @@ func newTodoListCmd() *cobra.Command {
 				if err != nil {
 					return err
 				}
-				return interactive.RunWithLoader(db, title, "", loader, authToken, cfg.Actions)
+				var interactiveLoader func() ([]things.Todo, error)
+				switch {
+				case flagProject != "":
+					interactiveLoader = func() ([]things.Todo, error) {
+						return db.ListProjectTodosWithCompleted(flagProject)
+					}
+				case flagArea != "":
+					interactiveLoader = func() ([]things.Todo, error) {
+						return db.ListAreaTodosWithCompleted(flagArea)
+					}
+				case flagTag != "":
+					interactiveLoader = func() ([]things.Todo, error) {
+						return db.ListTagTodosWithCompleted(flagTag)
+					}
+				}
+				return interactive.RunWithLoader(db, title, "", interactiveLoader, authToken, cfg.Actions, addList)
 			}
 
 			todos, err := loader()

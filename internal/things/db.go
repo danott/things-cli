@@ -348,6 +348,22 @@ func (d *DB) ListProjectTodos(titleOrID string) ([]Todo, error) {
 	return d.scanTodos(rows)
 }
 
+// ListProjectTodosWithCompleted returns open todos plus recently completed/canceled
+// todos belonging to a project, matched by UUID or title.
+func (d *DB) ListProjectTodosWithCompleted(titleOrID string) ([]Todo, error) {
+	logCutoff := `(SELECT manualLogDate FROM TMSettings LIMIT 1)`
+	query := todosQuery + ` AND (p.uuid = ? OR p.title = ?) AND (
+			t.status = 0
+			OR (t.status IN (2, 3) AND t.stopDate > ` + logCutoff + `)
+		) GROUP BY t.uuid ORDER BY t.status ASC, t."index"`
+	rows, err := d.db.Query(query, titleOrID, titleOrID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return d.scanTodos(rows)
+}
+
 // ListAreaTodos returns todos belonging to an area, matched by UUID or title.
 func (d *DB) ListAreaTodos(titleOrID string) ([]Todo, error) {
 	query := todosQuery + " AND (a.uuid = ? OR a.title = ?) AND t.status = 0 GROUP BY t.uuid ORDER BY t.\"index\""
@@ -359,9 +375,41 @@ func (d *DB) ListAreaTodos(titleOrID string) ([]Todo, error) {
 	return d.scanTodos(rows)
 }
 
+// ListAreaTodosWithCompleted returns open todos plus recently completed/canceled
+// todos belonging to an area, matched by UUID or title.
+func (d *DB) ListAreaTodosWithCompleted(titleOrID string) ([]Todo, error) {
+	logCutoff := `(SELECT manualLogDate FROM TMSettings LIMIT 1)`
+	query := todosQuery + ` AND (a.uuid = ? OR a.title = ?) AND (
+			t.status = 0
+			OR (t.status IN (2, 3) AND t.stopDate > ` + logCutoff + `)
+		) GROUP BY t.uuid ORDER BY t.status ASC, t."index"`
+	rows, err := d.db.Query(query, titleOrID, titleOrID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return d.scanTodos(rows)
+}
+
 // ListTagTodos returns todos with a specific tag, matched by UUID or title.
 func (d *DB) ListTagTodos(titleOrID string) ([]Todo, error) {
 	query := todosQuery + " AND (tag.uuid = ? OR tag.title = ?) AND t.status = 0 GROUP BY t.uuid ORDER BY t.\"index\""
+	rows, err := d.db.Query(query, titleOrID, titleOrID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return d.scanTodos(rows)
+}
+
+// ListTagTodosWithCompleted returns open todos plus recently completed/canceled
+// todos with a specific tag, matched by UUID or title.
+func (d *DB) ListTagTodosWithCompleted(titleOrID string) ([]Todo, error) {
+	logCutoff := `(SELECT manualLogDate FROM TMSettings LIMIT 1)`
+	query := todosQuery + ` AND (tag.uuid = ? OR tag.title = ?) AND (
+			t.status = 0
+			OR (t.status IN (2, 3) AND t.stopDate > ` + logCutoff + `)
+		) GROUP BY t.uuid ORDER BY t.status ASC, t."index"`
 	rows, err := d.db.Query(query, titleOrID, titleOrID)
 	if err != nil {
 		return nil, err

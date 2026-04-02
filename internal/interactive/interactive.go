@@ -44,6 +44,7 @@ type model struct {
 	err       error
 	status    string
 	actions   []config.Action
+	addList   string // list context for adding todos (project/area name); empty = use view default
 
 	// Detail view state
 	detailOpen   bool
@@ -68,16 +69,18 @@ func Run(db *things.DB, view, authToken string, actions []config.Action) error {
 	loader := func() ([]things.Todo, error) {
 		return db.ListTodosWithCompleted(view)
 	}
-	return RunWithLoader(db, view, view, loader, authToken, actions)
+	return RunWithLoader(db, view, view, loader, authToken, actions, "")
 }
 
 // RunWithLoader starts the interactive TUI with a custom todo loader.
 // title is shown as the list heading; view is used for add/when behavior.
-func RunWithLoader(db *things.DB, title, view string, loader func() ([]things.Todo, error), authToken string, actions []config.Action) error {
+// addList, when non-empty, enables adding todos and sets the list they go into.
+func RunWithLoader(db *things.DB, title, view string, loader func() ([]things.Todo, error), authToken string, actions []config.Action, addList string) error {
 	m, err := newModel(db, title, view, loader, authToken, actions)
 	if err != nil {
 		return err
 	}
+	m.addList = addList
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	_, err = p.Run()
 	return err
@@ -155,7 +158,7 @@ func (m model) Init() tea.Cmd {
 // listHelpSegments returns the ordered help segments for the list view.
 func (m model) listHelpSegments() []string {
 	segs := []string{"j/k: navigate", "enter: view", "e: edit", "o: reveal", "x: complete", "ctrl+x: cancel", "X: clear done"}
-	if viewSupportsAdd(m.view) {
+	if m.canAdd() {
 		segs = append(segs, "a: add")
 	}
 	for _, action := range m.actions {
@@ -380,7 +383,7 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case "a":
-		if viewSupportsAdd(m.view) {
+		if m.canAdd() {
 			m.adding = true
 			m.addInput.Reset()
 			m.addInput.Focus()
@@ -413,7 +416,7 @@ func (m model) updateAdding(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.adding = false
-		opts := things.AddTodoOptions{When: viewToWhen(m.view)}
+		opts := things.AddTodoOptions{When: viewToWhen(m.view), List: m.addList}
 		b := things.AddTodo(title, opts)
 		if err := b.Open(); err != nil {
 			m.err = err
@@ -895,6 +898,10 @@ func viewSupportsAdd(view string) bool {
 		return true
 	}
 	return false
+}
+
+func (m model) canAdd() bool {
+	return viewSupportsAdd(m.view) || m.addList != ""
 }
 
 func viewToWhen(view string) string {
