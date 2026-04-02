@@ -107,22 +107,26 @@ func PrintTodoJSON(w io.Writer, t *things.Todo) error {
 func PrintProjectsText(w io.Writer, projects []things.Project) {
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 	for _, p := range projects {
-		status := ""
-		if p.Status != things.StatusOpen {
-			status = string(p.Status)
+		check := "  "
+		if p.Status == things.StatusCompleted {
+			check = "x "
+		} else if p.Status == things.StatusCanceled {
+			check = "- "
 		}
-		fmt.Fprintf(tw, "%s\t%s\t%s\n", p.Name, p.ID, status)
+		fmt.Fprintf(tw, "%s%s\t%s\n", check, p.Name, p.AreaName)
 	}
 	tw.Flush()
 }
 
 func PrintProjectsMarkdown(w io.Writer, projects []things.Project) {
 	for _, p := range projects {
-		if p.Status != things.StatusOpen {
-			fmt.Fprintf(w, "- %s (%s)\n", p.Name, p.Status)
-		} else {
-			fmt.Fprintf(w, "- %s\n", p.Name)
+		check := " "
+		if p.Status == things.StatusCompleted {
+			check = "x"
+		} else if p.Status == things.StatusCanceled {
+			check = "-"
 		}
+		fmt.Fprintf(w, "- [%s] %s\n", check, p.Name)
 	}
 }
 
@@ -133,15 +137,7 @@ func PrintProjectsJSON(w io.Writer, projects []things.Project) error {
 }
 
 func PrintProjectText(w io.Writer, p *things.Project) {
-	fmt.Fprintf(w, "%s\n", p.Name)
-	fmt.Fprintf(w, "ID: %s\n", p.ID)
-	fmt.Fprintf(w, "Status: %s\n", p.Status)
-	if p.AreaName != "" {
-		fmt.Fprintf(w, "Area: %s\n", p.AreaName)
-	}
-	if p.Notes != "" {
-		fmt.Fprintf(w, "\n%s\n", p.Notes)
-	}
+	fmt.Fprint(w, things.ProjectToMarkdown(p))
 }
 
 func PrintProjectMarkdown(w io.Writer, p *things.Project) {

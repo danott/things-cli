@@ -59,6 +59,29 @@ func TodoToMarkdown(t *Todo) string {
 	return b.String()
 }
 
+// ProjectToMarkdown renders a Project as a markdown document with frontmatter,
+// matching the format used by TodoToMarkdown.
+func ProjectToMarkdown(p *Project) string {
+	var b strings.Builder
+
+	when := ""
+	if p.ActivationDate != nil {
+		when = p.ActivationDate.Format("2006-01-02")
+	}
+	deadline := ""
+	if p.DueDate != nil {
+		deadline = p.DueDate.Format("2006-01-02")
+	}
+	fmt.Fprintf(&b, "---\nstatus: %s\nwhen: %s\ndeadline: %s\ntags: %s\narea: %s\n---\n\n",
+		p.Status, when, deadline, p.TagNames, p.AreaName)
+
+	fmt.Fprintf(&b, "# %s\n", p.Name)
+	if p.Notes != "" {
+		fmt.Fprintf(&b, "\n%s\n", p.Notes)
+	}
+	return b.String()
+}
+
 // BlankTodoMarkdown returns a template for creating a new todo in the editor.
 func BlankTodoMarkdown() string {
 	return "---\nwhen: \ndeadline: \ntags: \nlist: \n---\n\n# \n"

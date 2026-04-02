@@ -39,11 +39,14 @@ type LogbookOptions struct {
 }
 
 type Project struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	Status   Status `json:"status"`
-	Notes    string `json:"notes,omitempty"`
-	AreaName string `json:"areaName,omitempty"`
+	ID             string     `json:"id"`
+	Name           string     `json:"name"`
+	Status         Status     `json:"status"`
+	Notes          string     `json:"notes,omitempty"`
+	AreaName       string     `json:"areaName,omitempty"`
+	TagNames       string     `json:"tagNames,omitempty"`
+	DueDate        *time.Time `json:"dueDate,omitempty"`
+	ActivationDate *time.Time `json:"activationDate,omitempty"`
 }
 
 type Area struct {

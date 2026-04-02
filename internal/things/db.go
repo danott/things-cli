@@ -427,10 +427,15 @@ func (d *DB) ListLogbook(opts LogbookOptions) ([]Todo, error) {
 // ListProjects returns all open projects.
 func (d *DB) ListProjects() ([]Project, error) {
 	rows, err := d.db.Query(`
-		SELECT t.uuid, t.title, t.status, COALESCE(t.notes, ''), COALESCE(a.title, '')
+		SELECT t.uuid, t.title, t.status, COALESCE(t.notes, ''),
+		       COALESCE(a.title, ''), t.startDate, t.deadline,
+		       GROUP_CONCAT(tag.title)
 		FROM TMTask t
 		LEFT JOIN TMArea a ON t.area = a.uuid
+		LEFT JOIN TMTaskTag tt ON t.uuid = tt.tasks
+		LEFT JOIN TMTag tag ON tt.tags = tag.uuid
 		WHERE t.type = 1 AND t.trashed = 0 AND t.status = 0
+		GROUP BY t.uuid
 		ORDER BY t."index"
 	`)
 	if err != nil {
@@ -442,10 +447,17 @@ func (d *DB) ListProjects() ([]Project, error) {
 	for rows.Next() {
 		var p Project
 		var status int
-		if err := rows.Scan(&p.ID, &p.Name, &status, &p.Notes, &p.AreaName); err != nil {
+		var startDate, deadline *int64
+		var tags *string
+		if err := rows.Scan(&p.ID, &p.Name, &status, &p.Notes, &p.AreaName, &startDate, &deadline, &tags); err != nil {
 			return nil, err
 		}
 		p.Status = dbStatusToStatus(status)
+		p.ActivationDate = optionalThingsDate(startDate)
+		p.DueDate = optionalThingsDate(deadline)
+		if tags != nil {
+			p.TagNames = *tags
+		}
 		projects = append(projects, p)
 	}
 	return projects, rows.Err()
@@ -454,17 +466,29 @@ func (d *DB) ListProjects() ([]Project, error) {
 // GetProject returns a project by UUID or title.
 func (d *DB) GetProject(titleOrID string) (*Project, error) {
 	row := d.db.QueryRow(`
-		SELECT t.uuid, t.title, t.status, COALESCE(t.notes, ''), COALESCE(a.title, '')
+		SELECT t.uuid, t.title, t.status, COALESCE(t.notes, ''),
+		       COALESCE(a.title, ''), t.startDate, t.deadline,
+		       GROUP_CONCAT(tag.title)
 		FROM TMTask t
 		LEFT JOIN TMArea a ON t.area = a.uuid
+		LEFT JOIN TMTaskTag tt ON t.uuid = tt.tasks
+		LEFT JOIN TMTag tag ON tt.tags = tag.uuid
 		WHERE (t.uuid = ? OR t.title = ?) AND t.type = 1
+		GROUP BY t.uuid
 	`, titleOrID, titleOrID)
 	var p Project
 	var status int
-	if err := row.Scan(&p.ID, &p.Name, &status, &p.Notes, &p.AreaName); err != nil {
+	var startDate, deadline *int64
+	var tags *string
+	if err := row.Scan(&p.ID, &p.Name, &status, &p.Notes, &p.AreaName, &startDate, &deadline, &tags); err != nil {
 		return nil, fmt.Errorf("project not found: %s", titleOrID)
 	}
 	p.Status = dbStatusToStatus(status)
+	p.ActivationDate = optionalThingsDate(startDate)
+	p.DueDate = optionalThingsDate(deadline)
+	if tags != nil {
+		p.TagNames = *tags
+	}
 	return &p, nil
 }
 
