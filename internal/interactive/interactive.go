@@ -37,6 +37,7 @@ type model struct {
 	cursor    int
 	offset    int // scroll offset for viewport
 	height    int // terminal height
+	width     int // terminal width
 	adding    bool
 	addInput  textinput.Model
 	authToken string
@@ -151,10 +152,22 @@ func (m model) Init() tea.Cmd {
 	return watchDB()
 }
 
+// listHelpSegments returns the ordered help segments for the list view.
+func (m model) listHelpSegments() []string {
+	segs := []string{"j/k: navigate", "enter: view", "e: edit", "o: reveal", "x: complete", "ctrl+x: cancel", "X: clear done"}
+	if viewSupportsAdd(m.view) {
+		segs = append(segs, "a: add")
+	}
+	for _, action := range m.actions {
+		segs = append(segs, action.Key+": "+action.Label)
+	}
+	return append(segs, "q: quit")
+}
+
 // listHeight returns how many item rows fit in the viewport.
-// Reserve lines for: title (1) + blank (1) + help bar (2) + status (1) + add input (1)
 func (m model) listHeight() int {
-	reserved := 4 // title + blank + help + bottom padding
+	helpLines := strings.Count(wrapHelp(m.listHelpSegments(), m.width), "\n") + 1
+	reserved := 3 + helpLines // title + blank + blank-before-help + helpLines
 	if m.adding {
 		reserved++
 	}
@@ -193,10 +206,22 @@ func (m *model) clampScroll() {
 	}
 }
 
+// detailHelpSegments returns the ordered help segments for the detail view.
+func (m model) detailHelpSegments() []string {
+	segs := []string{"j/k: scroll", "x: complete", "ctrl+x: cancel", "c: copy", "e: edit", "o: reveal"}
+	for _, action := range m.actions {
+		segs = append(segs, action.Key+": "+action.Label)
+	}
+	if m.singleMode {
+		return append(segs, "q: quit")
+	}
+	return append(segs, "enter/esc: back")
+}
+
 // detailHeight returns how many content lines fit in the detail viewport.
-// Reserve: help bar (2).
 func (m model) detailHeight() int {
-	h := m.height - 2
+	helpLines := strings.Count(wrapHelp(m.detailHelpSegments(), m.width), "\n") + 1
+	h := m.height - 1 - helpLines // blank-before-help + helpLines
 	if h < 1 {
 		h = 1
 	}
@@ -220,6 +245,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.height = msg.Height
+		m.width = msg.Width
 		if m.detailOpen {
 			m.clampDetailScroll()
 		} else {
@@ -590,17 +616,41 @@ func (m model) View() string {
 			cursor = cursorStyle.Render("> ")
 		}
 
-		name := todo.Name
-		switch todo.Status {
-		case things.StatusCompleted:
-			name = doneStyle.Render("✓ " + name)
-		case things.StatusCanceled:
-			name = cancelStyle.Render("✗ " + name)
-		default:
-			name = "  " + name
+		rawName := todo.Name
+		extra := todoExtra(todo)
+
+		// cursor(2) + statusPrefix(2) = 4 fixed chars
+		if m.width > 0 {
+			avail := m.width - 4
+			extraLen := 0
+			if extra != "" {
+				extraLen = 2 + len([]rune(extra)) // "  " + extra
+			}
+			nameLen := len([]rune(rawName))
+			if nameLen+extraLen > avail {
+				// Try to fit name + extra; if the name room is too small, drop extra
+				nameAvail := avail - extraLen
+				if extra == "" || nameAvail < 8 {
+					extra = ""
+					nameAvail = avail
+				}
+				if nameAvail > 0 && nameLen > nameAvail {
+					runes := []rune(rawName)
+					rawName = string(runes[:nameAvail-1]) + "…"
+				}
+			}
 		}
 
-		extra := todoExtra(todo)
+		var name string
+		switch todo.Status {
+		case things.StatusCompleted:
+			name = doneStyle.Render("✓ " + rawName)
+		case things.StatusCanceled:
+			name = cancelStyle.Render("✗ " + rawName)
+		default:
+			name = "  " + rawName
+		}
+
 		if extra != "" {
 			name += dimStyle.Render("  " + extra)
 		}
@@ -623,16 +673,8 @@ func (m model) View() string {
 		b.WriteString(fmt.Sprintf("\n  Error: %v\n", m.err))
 	}
 
-	help := "j/k: navigate  enter: view  e: edit  o: reveal  x: complete  ctrl+x: cancel  X: clear done"
-	if viewSupportsAdd(m.view) {
-		help += "  a: add"
-	}
-	for _, action := range m.actions {
-		help += fmt.Sprintf("  %s: %s", action.Key, action.Label)
-	}
-	help += "  q: quit"
 	b.WriteString("\n")
-	b.WriteString(dimStyle.Render(help))
+	b.WriteString(dimStyle.Render(wrapHelp(m.listHelpSegments(), m.width)))
 
 	return b.String()
 }
@@ -678,16 +720,7 @@ func (m model) viewDetail() string {
 
 	// Help bar
 	b.WriteString("\n")
-	detailHelp := "j/k: scroll  x: complete  ctrl+x: cancel  c: copy  e: edit  o: reveal"
-	for _, action := range m.actions {
-		detailHelp += fmt.Sprintf("  %s: %s", action.Key, action.Label)
-	}
-	if m.singleMode {
-		detailHelp += "  q: quit"
-	} else {
-		detailHelp += "  enter/esc: back"
-	}
-	b.WriteString(dimStyle.Render(detailHelp))
+	b.WriteString(dimStyle.Render(wrapHelp(m.detailHelpSegments(), m.width)))
 
 	return b.String()
 }
@@ -817,6 +850,30 @@ func clearStatusAfter(d time.Duration) tea.Cmd {
 	return tea.Tick(d, func(time.Time) tea.Msg {
 		return statusClearMsg{}
 	})
+}
+
+// wrapHelp joins help segments with two-space separators, wrapping to new
+// lines when a segment would exceed width. width <= 0 means no wrapping.
+func wrapHelp(segments []string, width int) string {
+	if width <= 0 {
+		return strings.Join(segments, "  ")
+	}
+	var lines []string
+	current := ""
+	for _, seg := range segments {
+		if current == "" {
+			current = seg
+		} else if len(current)+2+len(seg) <= width {
+			current += "  " + seg
+		} else {
+			lines = append(lines, current)
+			current = seg
+		}
+	}
+	if current != "" {
+		lines = append(lines, current)
+	}
+	return strings.Join(lines, "\n")
 }
 
 func todoExtra(t things.Todo) string {
