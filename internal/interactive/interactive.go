@@ -47,10 +47,11 @@ type model struct {
 	addList   string // list context for adding todos (project/area name); empty = use view default
 
 	// Detail view state
-	detailOpen   bool
-	detailLines  []string
-	detailOffset int
-	singleMode   bool // when true, quitting detail view quits the app
+	detailOpen     bool
+	detailMarkdown string   // raw markdown; source of truth for re-wrapping on resize
+	detailLines    []string // word-wrapped lines derived from detailMarkdown
+	detailOffset   int
+	singleMode     bool // when true, quitting detail view quits the app
 }
 
 type dbChangedMsg struct{}
@@ -116,9 +117,10 @@ func RunSingle(db *things.DB, todoID, authToken string, actions []config.Action)
 		authToken:    authToken,
 		actions:      actions,
 		height:       24,
-		detailOpen:   true,
-		detailLines:  strings.Split(things.TodoToMarkdown(todo), "\n"),
-		detailOffset: 0,
+		detailOpen:     true,
+		detailMarkdown: things.TodoToMarkdown(todo),
+		detailLines:    wrapDetailContent(things.TodoToMarkdown(todo), 0),
+		detailOffset:   0,
 		singleMode:   true,
 	}
 
@@ -250,6 +252,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		m.width = msg.Width
 		if m.detailOpen {
+			if m.detailMarkdown != "" {
+				m.detailLines = wrapDetailContent(m.detailMarkdown, m.width)
+			}
 			m.clampDetailScroll()
 		} else {
 			m.clampScroll()
@@ -364,7 +369,7 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.err = err
 				return m, nil
 			}
-			m.detailLines = strings.Split(things.TodoToMarkdown(todo), "\n")
+			m.setDetailContent(things.TodoToMarkdown(todo))
 			m.detailOffset = 0
 			m.detailOpen = true
 		}
@@ -582,7 +587,7 @@ func (m model) refresh() model {
 		if err != nil {
 			m.detailOpen = false
 		} else {
-			m.detailLines = strings.Split(things.TodoToMarkdown(todo), "\n")
+			m.setDetailContent(things.TodoToMarkdown(todo))
 			m.clampDetailScroll()
 		}
 	} else if m.detailOpen {
@@ -857,6 +862,67 @@ func clearStatusAfter(d time.Duration) tea.Cmd {
 
 // wrapHelp joins help segments with two-space separators, wrapping to new
 // lines when a segment would exceed width. width <= 0 means no wrapping.
+// setDetailContent stores the raw markdown and derives word-wrapped detail lines.
+func (m *model) setDetailContent(markdown string) {
+	m.detailMarkdown = markdown
+	m.detailLines = wrapDetailContent(markdown, m.width)
+}
+
+// wrapDetailContent splits markdown into display lines, word-wrapping prose
+// to min(width-1, 79) columns. Frontmatter delimiters and headings are not wrapped.
+func wrapDetailContent(markdown string, width int) []string {
+	maxWidth := 79
+	if width > 1 && width-1 < maxWidth {
+		maxWidth = width - 1
+	}
+	var result []string
+	for _, line := range strings.Split(markdown, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || trimmed == "---" || strings.HasPrefix(trimmed, "# ") {
+			result = append(result, line)
+			continue
+		}
+		result = append(result, wordWrapLine(line, maxWidth)...)
+	}
+	return result
+}
+
+// wordWrapLine breaks a single line into multiple lines at word boundaries.
+func wordWrapLine(line string, width int) []string {
+	if len([]rune(line)) <= width {
+		return []string{line}
+	}
+	// Preserve leading indentation on continuation lines.
+	indent := ""
+	for _, r := range line {
+		if r == ' ' || r == '\t' {
+			indent += string(r)
+		} else {
+			break
+		}
+	}
+	words := strings.Fields(line)
+	if len(words) == 0 {
+		return []string{line}
+	}
+	var lines []string
+	current := indent
+	for _, word := range words {
+		if current == indent {
+			current += word
+		} else if len([]rune(current))+1+len([]rune(word)) <= width {
+			current += " " + word
+		} else {
+			lines = append(lines, current)
+			current = indent + word
+		}
+	}
+	if current != indent {
+		lines = append(lines, current)
+	}
+	return lines
+}
+
 func wrapHelp(segments []string, width int) string {
 	if width <= 0 {
 		return strings.Join(segments, "  ")
