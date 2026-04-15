@@ -1,0 +1,163 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require "fileutils"
+
+BASE_DIR = ENV.fetch("THINGS_FOLDER_BASE", File.join(Dir.home, "things"))
+LOGBOOK_DIR = File.join(BASE_DIR, "logbook")
+TAG = "Folder"
+
+def slugify(name)
+  name
+    .downcase
+    .gsub(/[^a-z0-9-]/, "-")
+    .gsub(/-+/, "-")
+    .sub(/^-/, "").sub(/-$/, "")
+    .slice(0, 60)
+end
+
+def things(*args)
+  out = `things #{args.map { |a| Shellwords.shellescape(a) }.join(" ")} 2>/dev/null`
+  return nil unless $?.success?
+  out.strip
+end
+
+def things_json(*args)
+  out = things(*args, "--json")
+  out ? JSON.parse(out) : nil
+end
+
+def prefix_for(kind) = kind == "project" ? "p" : "t"
+
+def find_folder(kind, id, current_name: nil)
+  prefix = prefix_for(kind)
+  match = Dir.glob(File.join(BASE_DIR, "#{prefix}-*-#{id}")).find { |d| File.directory?(d) }
+  return nil unless match
+
+  if current_name
+    expected = File.join(BASE_DIR, "#{prefix}-#{slugify(current_name)}-#{id}")
+    if match != expected
+      FileUtils.mv(match, expected)
+      match = expected
+    end
+  end
+
+  match
+end
+
+def resolve_item(arg)
+  if data = things_json("project", "show", arg)
+    return { kind: "project", id: data["id"], name: data["name"], status: data["status"] }
+  end
+
+  if data = things_json("todo", "show", arg)
+    if data["projectID"] && !data["projectID"].empty?
+      warn "Note: \"#{data["name"]}\" belongs to project \"#{data["projectName"]}\"; using project folder."
+      project = things_json("project", "show", data["projectID"])
+      return { kind: "project", id: project["id"], name: project["name"], status: project["status"] }
+    end
+    return { kind: "todo", id: data["id"], name: data["name"], status: data["status"] }
+  end
+
+  abort "Error: could not find todo or project matching \"#{arg}\""
+end
+
+def parse_folder_name(basename)
+  prefix = basename[0]
+  kind = prefix == "p" ? "project" : "todo"
+  id = basename.split("-").last
+  { kind: kind, id: id }
+end
+
+def cmd_init(arg)
+  item = resolve_item(arg)
+  existing = find_folder(item[:kind], item[:id], current_name: item[:name])
+  if existing
+    puts existing
+    return
+  end
+
+  FileUtils.mkdir_p([BASE_DIR, LOGBOOK_DIR])
+
+  folder = File.join(BASE_DIR, "#{prefix_for(item[:kind])}-#{slugify(item[:name])}-#{item[:id]}")
+  FileUtils.mkdir_p(folder)
+
+  system("things", "tag", "add", TAG, err: File::NULL) # ignore if exists
+  system("things", item[:kind], "update", item[:id], "--add-tags", TAG)
+
+  puts folder
+end
+
+def cmd_path(arg)
+  item = resolve_item(arg)
+  existing = find_folder(item[:kind], item[:id], current_name: item[:name])
+  if existing
+    puts existing
+  else
+    abort "Error: no companion folder for \"#{item[:name]}\" (#{item[:id]})\nRun: things-folder init \"#{arg}\""
+  end
+end
+
+def cmd_list
+  found = false
+  Dir.glob(File.join(BASE_DIR, "{p,t}-*")).select { |d| File.directory?(d) }.each do |dir|
+    info = parse_folder_name(File.basename(dir))
+    data = things_json(info[:kind], "show", info[:id])
+    name = data ? data["name"] : "(unknown)"
+    status = data ? data["status"] : "?"
+    printf "%-10s %-12s %-40s %s\n", info[:kind], status, name, dir
+    found = true
+  end
+  warn "No companion folders found in #{BASE_DIR}" unless found
+end
+
+def cmd_archive(arg = nil)
+  FileUtils.mkdir_p(LOGBOOK_DIR)
+
+  if arg
+    item = resolve_item(arg)
+    existing = find_folder(item[:kind], item[:id])
+    abort "Error: no companion folder for \"#{item[:name]}\"" unless existing
+    FileUtils.mv(existing, File.join(LOGBOOK_DIR, File.basename(existing)))
+    puts "Archived: #{File.basename(existing)}"
+    return
+  end
+
+  archived = 0
+  Dir.glob(File.join(BASE_DIR, "{p,t}-*")).select { |d| File.directory?(d) }.each do |dir|
+    info = parse_folder_name(File.basename(dir))
+    data = things_json(info[:kind], "show", info[:id])
+    status = data ? data["status"] : "unknown"
+    if %w[completed canceled].include?(status)
+      FileUtils.mv(dir, File.join(LOGBOOK_DIR, File.basename(dir)))
+      puts "Archived: #{File.basename(dir)} (#{status})"
+      archived += 1
+    end
+  end
+  puts archived.zero? ? "Nothing to archive." : "Archived #{archived} folder(s)."
+end
+
+require "shellwords"
+
+case ARGV.shift
+when "init"    then cmd_init(ARGV.shift || abort("Usage: things-folder init <title-or-id>"))
+when "path"    then cmd_path(ARGV.shift || abort("Usage: things-folder path <title-or-id>"))
+when "list"    then cmd_list
+when "archive" then cmd_archive(ARGV.shift)
+when "-h", "--help", "help", nil
+  puts <<~USAGE
+    Usage: things-folder <command> [args]
+
+    Commands:
+      init <title-or-id>      Create a companion folder, tag the item
+      path <title-or-id>      Print the companion folder path
+      list                    List all active companion folders
+      archive [title-or-id]   Move completed/canceled folders to logbook
+
+    Environment:
+      THINGS_FOLDER_BASE      Base directory (default: ~/things)
+  USAGE
+else
+  abort "Unknown command. Run: things-folder --help"
+end

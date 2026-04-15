@@ -31,8 +31,8 @@ func TodoToMarkdown(t *Todo) string {
 	if list == "" {
 		list = t.AreaName
 	}
-	fmt.Fprintf(&b, "---\nstatus: %s\nwhen: %s\ndeadline: %s\ntags: %s\nlist: %s\n---\n\n",
-		t.Status, when, deadline, t.TagNames, list)
+	fmt.Fprintf(&b, "---\nid: %s\nstatus: %s\nwhen: %s\ndeadline: %s\ntags: %s\nlist: %s\n---\n\n",
+		t.ID, t.Status, when, deadline, t.TagNames, list)
 
 	// Title as H1
 	fmt.Fprintf(&b, "# %s\n", t.Name)
@@ -72,8 +72,8 @@ func ProjectToMarkdown(p *Project) string {
 	if p.DueDate != nil {
 		deadline = p.DueDate.Format("2006-01-02")
 	}
-	fmt.Fprintf(&b, "---\nstatus: %s\nwhen: %s\ndeadline: %s\ntags: %s\narea: %s\n---\n\n",
-		p.Status, when, deadline, p.TagNames, p.AreaName)
+	fmt.Fprintf(&b, "---\nid: %s\nstatus: %s\nwhen: %s\ndeadline: %s\ntags: %s\narea: %s\n---\n\n",
+		p.ID, p.Status, when, deadline, p.TagNames, p.AreaName)
 
 	fmt.Fprintf(&b, "# %s\n", p.Name)
 	if p.Notes != "" {

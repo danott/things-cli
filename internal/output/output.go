@@ -68,6 +68,7 @@ func PrintTodoMarkdown(w io.Writer, t *things.Todo) {
 		check = "-"
 	}
 	fmt.Fprintf(w, "- [%s] %s\n", check, t.Name)
+	fmt.Fprintf(w, "  **ID:** %s\n", t.ID)
 	if t.ProjectName != "" {
 		fmt.Fprintf(w, "  **Project:** %s\n", t.ProjectName)
 	}
@@ -142,6 +143,7 @@ func PrintProjectText(w io.Writer, p *things.Project) {
 
 func PrintProjectMarkdown(w io.Writer, p *things.Project) {
 	fmt.Fprintf(w, "# %s\n", p.Name)
+	fmt.Fprintf(w, "\n**ID:** %s\n", p.ID)
 	if p.Status != things.StatusOpen {
 		fmt.Fprintf(w, "\n**Status:** %s\n", p.Status)
 	}

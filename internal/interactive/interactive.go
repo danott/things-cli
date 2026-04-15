@@ -778,10 +778,12 @@ func (m model) runAction(action config.Action) (tea.Model, tea.Cmd) {
 	}
 
 	var args []string
-	if action.InputMode == config.ActionInputModeArg {
-		args = append([]string{content}, action.Args...)
-	} else {
-		args = append([]string{}, action.Args...)
+	for _, a := range action.Args {
+		if action.InputMode == config.ActionInputModeArg {
+			args = append(args, strings.ReplaceAll(a, "$1", content))
+		} else {
+			args = append(args, a)
+		}
 	}
 	c := exec.Command(action.Command, args...)
 
