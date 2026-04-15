@@ -10,6 +10,11 @@ const (
 	StatusCanceled  Status = "canceled"
 )
 
+const (
+	StartBucketMorning = 0
+	StartBucketEvening = 1
+)
+
 type Todo struct {
 	ID               string          `json:"id"`
 	Name             string          `json:"name"`

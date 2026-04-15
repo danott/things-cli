@@ -12,7 +12,14 @@ import (
 
 func PrintTodosText(w io.Writer, todos []things.Todo, verbose bool) {
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
+	prevBucket := -1
 	for _, t := range todos {
+		if t.StartBucket == things.StartBucketEvening && prevBucket != things.StartBucketEvening {
+			tw.Flush()
+			fmt.Fprintln(w, "\nThis Evening\n")
+			tw = tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
+		}
+		prevBucket = t.StartBucket
 		check := "  "
 		if t.Status == things.StatusCompleted {
 			check = "x "
@@ -39,7 +46,12 @@ func PrintTodosText(w io.Writer, todos []things.Todo, verbose bool) {
 }
 
 func PrintTodosMarkdown(w io.Writer, todos []things.Todo) {
+	prevBucket := -1
 	for _, t := range todos {
+		if t.StartBucket == things.StartBucketEvening && prevBucket != things.StartBucketEvening {
+			fmt.Fprintln(w, "\n## This Evening\n")
+		}
+		prevBucket = t.StartBucket
 		check := " "
 		if t.Status == things.StatusCompleted {
 			check = "x"

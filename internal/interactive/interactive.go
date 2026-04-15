@@ -619,6 +619,15 @@ func (m model) View() string {
 
 	for i := m.offset; i < end; i++ {
 		todo := m.items[i]
+
+		if todo.StartBucket == things.StartBucketEvening {
+			if i == 0 || m.items[i-1].StartBucket != things.StartBucketEvening {
+				b.WriteString("\n")
+				b.WriteString(boldStyle.Render("  This Evening"))
+				b.WriteString("\n\n")
+			}
+		}
+
 		cursor := "  "
 		if i == m.cursor {
 			cursor = cursorStyle.Render("> ")
