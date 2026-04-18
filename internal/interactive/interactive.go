@@ -634,27 +634,14 @@ func (m model) View() string {
 		}
 
 		rawName := todo.Name
-		extra := todoExtra(todo)
 
 		// cursor(2) + statusPrefix(2) = 4 fixed chars
 		if m.width > 0 {
 			avail := m.width - 4
-			extraLen := 0
-			if extra != "" {
-				extraLen = 2 + len([]rune(extra)) // "  " + extra
-			}
 			nameLen := len([]rune(rawName))
-			if nameLen+extraLen > avail {
-				// Try to fit name + extra; if the name room is too small, drop extra
-				nameAvail := avail - extraLen
-				if extra == "" || nameAvail < 8 {
-					extra = ""
-					nameAvail = avail
-				}
-				if nameAvail > 0 && nameLen > nameAvail {
-					runes := []rune(rawName)
-					rawName = string(runes[:nameAvail-1]) + "…"
-				}
+			if nameLen > avail && avail > 0 {
+				runes := []rune(rawName)
+				rawName = string(runes[:avail-1]) + "…"
 			}
 		}
 
@@ -666,10 +653,6 @@ func (m model) View() string {
 			name = cancelStyle.Render("✗ " + rawName)
 		default:
 			name = "  " + rawName
-		}
-
-		if extra != "" {
-			name += dimStyle.Render("  " + extra)
 		}
 
 		b.WriteString(fmt.Sprintf("%s%s\n", cursor, name))
@@ -707,7 +690,7 @@ func (m model) viewDetail() string {
 	}
 
 	inFrontmatter := false
-	// Determine if we're inside frontmatter at the start of the visible window
+	// Determine if we're inside frontmatter at the start of the visible window.
 	for i := 0; i < m.detailOffset && i < len(m.detailLines); i++ {
 		if strings.TrimSpace(m.detailLines[i]) == "---" {
 			inFrontmatter = !inFrontmatter
@@ -954,19 +937,6 @@ func wrapHelp(segments []string, width int) string {
 		lines = append(lines, current)
 	}
 	return strings.Join(lines, "\n")
-}
-
-func todoExtra(t things.Todo) string {
-	var parts []string
-	if t.ProjectName != "" {
-		parts = append(parts, t.ProjectName)
-	} else if t.AreaName != "" {
-		parts = append(parts, t.AreaName)
-	}
-	if t.TagNames != "" {
-		parts = append(parts, "["+t.TagNames+"]")
-	}
-	return strings.Join(parts, "  ")
 }
 
 func viewSupportsAdd(view string) bool {

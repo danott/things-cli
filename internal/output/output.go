@@ -27,20 +27,10 @@ func PrintTodosText(w io.Writer, todos []things.Todo, verbose bool) {
 		} else if t.Status == things.StatusCanceled {
 			check = "- "
 		}
-		extra := ""
-		if t.TagNames != "" {
-			extra = "  [" + t.TagNames + "]"
-		}
-		project := ""
-		if t.ProjectName != "" {
-			project = t.ProjectName
-		} else if t.AreaName != "" {
-			project = t.AreaName
-		}
 		if verbose {
-			fmt.Fprintf(tw, "%s%s\t%s\t%s\t%s\n", check, t.Name, t.ID, project, extra)
+			fmt.Fprintf(tw, "%s%s\t%s\n", check, t.Name, t.ID)
 		} else {
-			fmt.Fprintf(tw, "%s%s\t%s\t%s\n", check, t.Name, project, extra)
+			fmt.Fprintf(tw, "%s%s\n", check, t.Name)
 		}
 	}
 	tw.Flush()
