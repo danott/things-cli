@@ -6,6 +6,7 @@ import (
 	"io"
 	"strings"
 	"text/tabwriter"
+	"time"
 
 	"github.com/danott/things-cli/internal/things"
 )
@@ -73,29 +74,49 @@ func PrintTodoText(w io.Writer, t *things.Todo) {
 }
 
 func PrintTodoMarkdown(w io.Writer, t *things.Todo) {
-	check := " "
-	if t.Status == things.StatusCompleted {
-		check = "x"
-	} else if t.Status == things.StatusCanceled {
-		check = "-"
-	}
-	fmt.Fprintf(w, "- [%s] %s\n", check, t.Name)
-	fmt.Fprintf(w, "  **ID:** %s\n", t.ID)
+	fmt.Fprintln(w, "---")
+	fmt.Fprintf(w, "id: %s\n", t.ID)
+	fmt.Fprintf(w, "status: %s\n", t.Status)
 	if t.ProjectName != "" {
-		fmt.Fprintf(w, "  **Project:** %s\n", t.ProjectName)
+		fmt.Fprintf(w, "project: %s\n", t.ProjectName)
+	}
+	if t.ProjectID != "" {
+		fmt.Fprintf(w, "project-id: %s\n", t.ProjectID)
 	}
 	if t.AreaName != "" {
-		fmt.Fprintf(w, "  **Area:** %s\n", t.AreaName)
+		fmt.Fprintf(w, "area: %s\n", t.AreaName)
+	}
+	if t.AreaID != "" {
+		fmt.Fprintf(w, "area-id: %s\n", t.AreaID)
 	}
 	if t.TagNames != "" {
-		fmt.Fprintf(w, "  **Tags:** %s\n", t.TagNames)
-	}
-	if t.DueDate != nil {
-		fmt.Fprintf(w, "  **Deadline:** %s\n", t.DueDate.Format("2006-01-02"))
+		fmt.Fprintf(w, "tags: %s\n", t.TagNames)
 	}
 	if t.ActivationDate != nil {
-		fmt.Fprintf(w, "  **When:** %s\n", t.ActivationDate.Format("2006-01-02"))
+		fmt.Fprintf(w, "when: %s\n", t.ActivationDate.Format("2006-01-02"))
 	}
+	if t.DueDate != nil {
+		fmt.Fprintf(w, "deadline: %s\n", t.DueDate.Format("2006-01-02"))
+	}
+	if t.StartBucket == things.StartBucketEvening {
+		fmt.Fprintln(w, "start-bucket: evening")
+	} else if t.StartBucket == things.StartBucketMorning && t.ActivationDate != nil {
+		fmt.Fprintln(w, "start-bucket: morning")
+	}
+	if t.CreationDate != nil {
+		fmt.Fprintf(w, "created: %s\n", t.CreationDate.Format(time.RFC3339))
+	}
+	if t.ModificationDate != nil {
+		fmt.Fprintf(w, "modified: %s\n", t.ModificationDate.Format(time.RFC3339))
+	}
+	if t.CompletionDate != nil {
+		fmt.Fprintf(w, "completed: %s\n", t.CompletionDate.Format(time.RFC3339))
+	}
+	if t.CancellationDate != nil {
+		fmt.Fprintf(w, "canceled: %s\n", t.CancellationDate.Format(time.RFC3339))
+	}
+	fmt.Fprintln(w, "---")
+	fmt.Fprintf(w, "\n# %s\n", t.Name)
 	if t.Notes != "" {
 		fmt.Fprintf(w, "\n%s\n", t.Notes)
 	}
@@ -106,7 +127,11 @@ func PrintTodoMarkdown(w io.Writer, t *things.Todo) {
 			if item.Status == things.StatusCompleted {
 				itemCheck = "x"
 			}
-			fmt.Fprintf(w, "  - [%s] %s\n", itemCheck, item.Name)
+			if item.ID != "" {
+				fmt.Fprintf(w, "- [%s] %s (%s)\n", itemCheck, item.Name, item.ID)
+			} else {
+				fmt.Fprintf(w, "- [%s] %s\n", itemCheck, item.Name)
+			}
 		}
 	}
 }
@@ -154,14 +179,23 @@ func PrintProjectText(w io.Writer, p *things.Project) {
 }
 
 func PrintProjectMarkdown(w io.Writer, p *things.Project) {
-	fmt.Fprintf(w, "# %s\n", p.Name)
-	fmt.Fprintf(w, "\n**ID:** %s\n", p.ID)
-	if p.Status != things.StatusOpen {
-		fmt.Fprintf(w, "\n**Status:** %s\n", p.Status)
-	}
+	fmt.Fprintln(w, "---")
+	fmt.Fprintf(w, "id: %s\n", p.ID)
+	fmt.Fprintf(w, "status: %s\n", p.Status)
 	if p.AreaName != "" {
-		fmt.Fprintf(w, "\n**Area:** %s\n", p.AreaName)
+		fmt.Fprintf(w, "area: %s\n", p.AreaName)
 	}
+	if p.TagNames != "" {
+		fmt.Fprintf(w, "tags: %s\n", p.TagNames)
+	}
+	if p.ActivationDate != nil {
+		fmt.Fprintf(w, "when: %s\n", p.ActivationDate.Format("2006-01-02"))
+	}
+	if p.DueDate != nil {
+		fmt.Fprintf(w, "deadline: %s\n", p.DueDate.Format("2006-01-02"))
+	}
+	fmt.Fprintln(w, "---")
+	fmt.Fprintf(w, "\n# %s\n", p.Name)
 	if p.Notes != "" {
 		fmt.Fprintf(w, "\n%s\n", p.Notes)
 	}
