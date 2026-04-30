@@ -32,6 +32,8 @@ type Todo struct {
 	AreaID           string          `json:"areaID,omitempty"`
 	AreaName         string          `json:"areaName,omitempty"`
 	StartBucket      int             `json:"startBucket,omitempty"` // 0=morning, 1=evening (Today view only)
+	HeadingID        string          `json:"headingID,omitempty"`
+	HeadingName      string          `json:"headingName,omitempty"`
 	ChecklistItems   []ChecklistItem `json:"checklistItems,omitempty"`
 }
 

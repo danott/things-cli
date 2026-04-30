@@ -130,14 +130,17 @@ const todosQuery = `
 SELECT t.uuid, t.title, t.status, t.notes,
        t.startDate, t.deadline, t.creationDate, t.userModificationDate, t.stopDate,
        t.todayIndex, t.startBucket,
-       p.title, p.uuid,
+       COALESCE(p.title, hp.title), COALESCE(p.uuid, hp.uuid),
        a.title, a.uuid,
-       GROUP_CONCAT(tag.title)
+       GROUP_CONCAT(tag.title),
+       h.title, h.uuid
 FROM TMTask t
 LEFT JOIN TMTask p ON t.project = p.uuid
 LEFT JOIN TMArea a ON t.area = a.uuid
 LEFT JOIN TMTaskTag tt ON t.uuid = tt.tasks
 LEFT JOIN TMTag tag ON tt.tags = tag.uuid
+LEFT JOIN TMTask h ON t.heading = h.uuid AND h.type = 2
+LEFT JOIN TMTask hp ON h.project = hp.uuid AND hp.type = 1
 WHERE t.type = 0 AND t.trashed = 0
 `
 
@@ -159,10 +162,13 @@ func (d *DB) scanTodos(rows *sql.Rows) ([]Todo, error) {
 			areaName     *string
 			areaID       *string
 			tags         *string
+			headingName  *string
+			headingID    *string
 		)
 		err := rows.Scan(&t.ID, &t.Name, &status, &t.Notes,
 			&startDate, &deadline, &creationDate, &modDate, &stopDate,
-			&todayIndex, &startBucket, &projectName, &projectID, &areaName, &areaID, &tags)
+			&todayIndex, &startBucket, &projectName, &projectID, &areaName, &areaID, &tags,
+			&headingName, &headingID)
 		if err != nil {
 			return nil, fmt.Errorf("scan todo: %w", err)
 		}
@@ -196,6 +202,12 @@ func (d *DB) scanTodos(rows *sql.Rows) ([]Todo, error) {
 		}
 		if tags != nil {
 			t.TagNames = *tags
+		}
+		if headingName != nil {
+			t.HeadingName = *headingName
+		}
+		if headingID != nil {
+			t.HeadingID = *headingID
 		}
 		todos = append(todos, t)
 	}
@@ -339,8 +351,8 @@ func (d *DB) ListTodosWithCompleted(view string) ([]Todo, error) {
 
 // ListProjectTodos returns todos belonging to a project, matched by UUID or title.
 func (d *DB) ListProjectTodos(titleOrID string) ([]Todo, error) {
-	query := todosQuery + " AND (p.uuid = ? OR p.title = ?) AND t.status = 0 GROUP BY t.uuid ORDER BY t.\"index\""
-	rows, err := d.db.Query(query, titleOrID, titleOrID)
+	query := todosQuery + ` AND (p.uuid = ? OR p.title = ? OR hp.uuid = ? OR hp.title = ?) AND t.status = 0 GROUP BY t.uuid ORDER BY t."index"`
+	rows, err := d.db.Query(query, titleOrID, titleOrID, titleOrID, titleOrID)
 	if err != nil {
 		return nil, err
 	}
@@ -352,11 +364,11 @@ func (d *DB) ListProjectTodos(titleOrID string) ([]Todo, error) {
 // todos belonging to a project, matched by UUID or title.
 func (d *DB) ListProjectTodosWithCompleted(titleOrID string) ([]Todo, error) {
 	logCutoff := `(SELECT manualLogDate FROM TMSettings LIMIT 1)`
-	query := todosQuery + ` AND (p.uuid = ? OR p.title = ?) AND (
+	query := todosQuery + ` AND (p.uuid = ? OR p.title = ? OR hp.uuid = ? OR hp.title = ?) AND (
 			t.status = 0
 			OR (t.status IN (2, 3) AND t.stopDate > ` + logCutoff + `)
 		) GROUP BY t.uuid ORDER BY t.status ASC, t."index"`
-	rows, err := d.db.Query(query, titleOrID, titleOrID)
+	rows, err := d.db.Query(query, titleOrID, titleOrID, titleOrID, titleOrID)
 	if err != nil {
 		return nil, err
 	}

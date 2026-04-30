@@ -14,13 +14,32 @@ import (
 func PrintTodosText(w io.Writer, todos []things.Todo, verbose bool) {
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 	prevBucket := -1
+	prevHeading := ""
+	hasHeadings := false
+	for _, t := range todos {
+		if t.HeadingID != "" {
+			hasHeadings = true
+			break
+		}
+	}
 	for _, t := range todos {
 		if t.StartBucket == things.StartBucketEvening && prevBucket != things.StartBucketEvening {
 			tw.Flush()
-			fmt.Fprintln(w, "\nThis Evening\n")
+			fmt.Fprintf(w, "\nThis Evening\n\n")
 			tw = tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
+			prevHeading = ""
 		}
 		prevBucket = t.StartBucket
+		if hasHeadings && t.HeadingID != prevHeading {
+			tw.Flush()
+			if t.HeadingName != "" {
+				fmt.Fprintf(w, "\n%s\n\n", t.HeadingName)
+			} else {
+				fmt.Fprintln(w)
+			}
+			tw = tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
+			prevHeading = t.HeadingID
+		}
 		check := "  "
 		if t.Status == things.StatusCompleted {
 			check = "x "
@@ -38,11 +57,28 @@ func PrintTodosText(w io.Writer, todos []things.Todo, verbose bool) {
 
 func PrintTodosMarkdown(w io.Writer, todos []things.Todo) {
 	prevBucket := -1
+	prevHeading := ""
+	hasHeadings := false
+	for _, t := range todos {
+		if t.HeadingID != "" {
+			hasHeadings = true
+			break
+		}
+	}
 	for _, t := range todos {
 		if t.StartBucket == things.StartBucketEvening && prevBucket != things.StartBucketEvening {
-			fmt.Fprintln(w, "\n## This Evening\n")
+			fmt.Fprintf(w, "\n## This Evening\n\n")
+			prevHeading = ""
 		}
 		prevBucket = t.StartBucket
+		if hasHeadings && t.HeadingID != prevHeading {
+			if t.HeadingName != "" {
+				fmt.Fprintf(w, "\n### %s\n\n", t.HeadingName)
+			} else {
+				fmt.Fprintln(w)
+			}
+			prevHeading = t.HeadingID
+		}
 		check := " "
 		if t.Status == things.StatusCompleted {
 			check = "x"
